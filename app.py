@@ -1,28 +1,35 @@
+import os
 from flask import Flask, request, jsonify
-from crawler.jd import get_jd_price
-from crawler.dangdang import get_dangdang_price
-from crawler.taobao import get_taobao_price
+from crawler.taobao import search_price as taobao_price
+from crawler.jd import search_price as jd_price
+from crawler.dangdang import search_price as dangdang_price
 
 app = Flask(__name__)
 
-@app.route('/')
-def index():
-    return "欢迎使用图书价格查询接口"
-
 @app.route('/api/price', methods=['POST'])
-def get_price():
+def price():
     data = request.json
-    book_name = data.get("book_name")
+    book_name = data.get("book_name", "").strip()
     if not book_name:
-        return jsonify({"error": "缺少参数：book_name"}), 400
+        return jsonify({"error": "请提供书名"}), 400
 
-    result = {
-        "京东": get_jd_price(book_name),
-        "当当": get_dangdang_price(book_name),
-        "淘宝": get_taobao_price(book_name)
-    }
+    try:
+        prices = {
+            "淘宝": taobao_price(book_name),
+            "京东": jd_price(book_name),
+            "当当": dangdang_price(book_name)
+        }
+        return jsonify({
+            "book_name": book_name,
+            "prices": prices
+        })
+    except Exception as e:
+        return jsonify({"error": f"查询失败: {str(e)}"}), 500
 
-    return jsonify(result)
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host='0.0.0.0', port=port)
